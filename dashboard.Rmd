@@ -1,0 +1,119 @@
+---
+title: "NSW COVID-19 cases by postcode"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+
+library(flexdashboard)
+library(tidyverse)
+library(leaflet)
+library(DT)
+library(crosstalk)
+library(plotly)
+library(sf)
+```
+
+```{r getdata, cache = TRUE}
+stream_url <- "https://data.nsw.gov.au/data/dataset/aefcde60-3b0c-4bc0-9af1-6fe652944ec2/resource/21304414-1ff1-4243-a5d2-f52778048b29/download/covid-19-cases-by-notification-date-and-postcode-local-health-district-and-local-government-area.csv"
+
+case_stream <- read_csv(stream_url) %>%
+  rename(Postcode = postcode, Date = notification_date) %>%
+  mutate(Postcode = replace_na(Postcode, "Unknown"))
+```
+
+
+
+```{r case_time_series}
+case_series <- case_stream %>%
+  group_by(Date, Postcode) %>%
+  summarise(`New cases` = n()) %>%
+  arrange(Date) %>%
+  ungroup() %>%
+  group_by(Postcode) %>%
+  mutate(`Cumulative cases` = cumsum(`New cases`)) %>%
+  ungroup()
+
+shared_series <- SharedData$new(case_series, key = ~Postcode, group = "series")
+```
+
+```{r case_summaries}
+nsw_pop <- read_csv("data/poa_pop.csv",
+                    col_types = cols(
+                      Postcode = col_character(),
+                      Population = col_integer()))
+
+case_summary <- case_series %>%
+  group_by(Postcode) %>%
+  summarise(Count = max(`Cumulative cases`),
+            `First notification` = min(Date),
+            `Last notification` = max(Date)) %>%
+  left_join(nsw_pop) %>%
+  mutate(`Cases per 100,000` = (Count / Population) * 100000)
+  
+shared_cases <- SharedData$new(case_summary, key = ~Postcode, group = "series")
+```
+
+```{r geospatial,  message = FALSE, warning = FALSE}
+nsw <- st_read("data/nsw_poa_simple.gpkg", quiet = TRUE) %>%
+  select(Postcode = POA_CODE16) %>%
+  left_join(case_summary) %>%
+  mutate(Count = replace_na(Count, 0))
+
+shared_nsw <- SharedData$new(nsw, key = ~Postcode, group = "series")
+```
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### NSW choropleth
+
+```{r}
+choro_pal <- colorNumeric(palette = "Reds",
+                          domain = log2(case_summary$Count))
+
+leaflet(shared_nsw) %>%
+  addProviderTiles("Stamen.TonerLite") %>%
+  fitBounds(150.517484, -33.545619, 151.332415, -34.130942) %>%
+  addPolygons(stroke = TRUE,
+              weight = 0,
+              color = "#fff",
+              opacity = 0.01,
+              fillColor = ~choro_pal(log2(Count)),
+              fillOpacity = 0.5,
+              label = ~str_glue("Postcode: {Postcode}; {Count} cases"),
+              highlight = highlightOptions(weight = 5,
+                                           stroke = TRUE, 
+                                           color = "#666",
+                                           opacity = 2/3,
+                                           bringToFront = TRUE))
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Cases by postcode
+
+```{r}
+datatable(shared_cases, style = "bootstrap", class = "compact", rownames = FALSE, fillContainer = TRUE)
+
+```
+
+### Case time series
+
+```{r}
+p <- ggplot(shared_series) +
+  geom_line(aes(x = Date, y = `Cumulative cases`, group = Postcode)) +
+  labs(x = "Date", y = "Cumulative cases")
+
+ggplotly(p)
+```
+
+
+
+
