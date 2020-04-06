@@ -72,9 +72,9 @@ shared_nsw <- SharedData$new(nsw, key = ~Postcode, group = "series")
 Column {data-width=650}
 -----------------------------------------------------------------------
 
-### Data sources {data-height=12}
+### Data sources {data-height=15}
 
-[NSW Health reported cases](https://data.nsw.gov.au/data/dataset/covid-19-cases-by-location/resource/21304414-1ff1-4243-a5d2-f52778048b29); [ABS postcode geometries](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/1270.0.55.003~July%202016~Main%20Features~Postal%20Areas%20(POA)~8); [ABS 2016 population data](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/2033.0.55.001~2016~Main%20Features~FAQs%20-%20SEIFA%202016~4). 
+[NSW Health reported cases](https://data.nsw.gov.au/data/dataset/covid-19-cases-by-location/resource/21304414-1ff1-4243-a5d2-f52778048b29) last updated `r max(case_stream$Date)`; [ABS 2016 postcode geometries](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/1270.0.55.003~July%202016~Main%20Features~Postal%20Areas%20(POA)~8); [ABS 2016 population data](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/2033.0.55.001~2016~Main%20Features~FAQs%20-%20SEIFA%202016~4). 
 
 ### NSW choropleth
 
