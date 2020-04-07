@@ -128,6 +128,7 @@ Column {data-width=350}
 
 ```{r}
 datatable(shared_cases,
+          style = "default",
           class = "compact",
           rownames = FALSE,
           fillContainer = TRUE,
