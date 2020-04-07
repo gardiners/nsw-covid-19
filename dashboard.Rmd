@@ -19,15 +19,9 @@ library(plotly)
 library(sf)
 ```
 
-```{r getdata}
-stream_url <- "https://data.nsw.gov.au/data/dataset/aefcde60-3b0c-4bc0-9af1-6fe652944ec2/resource/21304414-1ff1-4243-a5d2-f52778048b29/download/covid-19-cases-by-notification-date-and-postcode-local-health-district-and-local-government-area.csv"
-
-case_stream <- read_csv(stream_url) %>%
-  rename(Postcode = postcode, Date = notification_date) %>%
-  mutate(Postcode = replace_na(Postcode, "Unknown"))
+```{r get_case_stream}
+case_stream <- readRDS("data/case_stream.rds")
 ```
-
-
 
 ```{r case_time_series}
 case_series <- case_stream %>%
@@ -69,35 +63,63 @@ shared_nsw <- SharedData$new(nsw, key = ~Postcode, group = "series")
 ```
 
 
-Column {data-width=650}
+Column {data-width=650, .tabset}
 -----------------------------------------------------------------------
 
-### Data sources {data-height=15}
-
-[NSW Health reported cases](https://data.nsw.gov.au/data/dataset/covid-19-cases-by-location/resource/21304414-1ff1-4243-a5d2-f52778048b29) last updated `r max(case_stream$Date)`; [ABS 2016 postcode geometries](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/1270.0.55.003~July%202016~Main%20Features~Postal%20Areas%20(POA)~8); [ABS 2016 population data](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/2033.0.55.001~2016~Main%20Features~FAQs%20-%20SEIFA%202016~4). 
-
-### NSW choropleth
+### NSW choropleth by postcode
 
 ```{r}
-choro_pal <- colorNumeric(palette = "Reds",
-                          domain = log2(case_summary$Count))
+rate_pal <- colorNumeric(palette = "Reds",
+                          domain = case_summary$Count)
+pop_pal <- colorNumeric(palette = "Reds",
+                          domain = case_summary$`Cases per 100,000`)
 
 leaflet(shared_nsw) %>%
   addProviderTiles("Stamen.TonerLite") %>%
+  addLayersControl(baseGroups = c("Case rate", "Case count"),
+                   options = layersControlOptions(collapsed = FALSE)) %>%
   fitBounds(150.517484, -33.545619, 151.332415, -34.130942) %>%
-  addPolygons(stroke = TRUE,
-              weight = 0,
-              color = "#fff",
-              opacity = 0.01,
-              fillColor = ~choro_pal(log2(Count)),
-              fillOpacity = 0.5,
-              label = ~str_glue("Postcode: {Postcode}; {Count} cases"),
-              highlight = highlightOptions(weight = 5,
-                                           stroke = TRUE, 
-                                           color = "#666",
-                                           opacity = 2/3,
-                                           bringToFront = TRUE))
+  addPolygons(
+    group = "Case count",
+    stroke = TRUE,
+    weight = 0,
+    color = "#fff",
+    opacity = 0.01,
+    fillColor = ~rate_pal(Count),
+    fillOpacity = 0.5,
+    label = ~str_glue("Postcode: {Postcode}; {Count} cases"),
+    highlight = highlightOptions(weight = 5,
+                                 stroke = TRUE, 
+                                 color = "#666",
+                                 opacity = 2/3,
+                                 bringToFront = TRUE)) %>%
+  addLegend(pal = rate_pal, values = ~Count, title = "Case count", group = "Case count") %>%
+    addPolygons(
+    group = "Case rate",
+    stroke = TRUE,
+    weight = 0,
+    color = "#fff",
+    opacity = 0.01,
+    fillColor = ~pop_pal(`Cases per 100,000`),
+    fillOpacity = 0.5,
+    label = ~str_glue("Postcode: {Postcode}; {`Cases per 100,000`} cases per 100,000 people"),
+    highlight = highlightOptions(weight = 5,
+                                 stroke = TRUE, 
+                                 color = "#666",
+                                 opacity = 2/3,
+                                 bringToFront = TRUE)) %>%
+  addLegend(pal = pop_pal,
+            values = ~`Cases per 100,000`,
+            title = "Case rate <br>(per 100,000)",
+            group = "Case rate")
+
 ```
+
+### Data sources
+
+* [NSW Health reported cases](https://data.nsw.gov.au/data/dataset/covid-19-cases-by-location/resource/21304414-1ff1-4243-a5d2-f52778048b29) (last updated `r max(case_stream$Date)`).
+* [ABS 2016 postcode geometries](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/1270.0.55.003~July%202016~Main%20Features~Postal%20Areas%20(POA)~8).
+* [ABS 2016 population data](https://www.abs.gov.au/ausstats/abs@.nsf/Lookup/by%20Subject/2033.0.55.001~2016~Main%20Features~FAQs%20-%20SEIFA%202016~4). 
 
 Column {data-width=350}
 -----------------------------------------------------------------------
@@ -106,29 +128,26 @@ Column {data-width=350}
 
 ```{r}
 datatable(shared_cases,
-          style = "bootstrap",
           class = "compact",
           rownames = FALSE,
           fillContainer = TRUE,
           filter = list(position = "top"),
           options = list(
+            pageLength = 50,
             dom = "tp",
             order = list((list(1, "desc")))
           ))
 
 ```
 
-### Case time series (log scale) 
+### Cumulative cases (log scale)
 
 ```{r}
 p <- ggplot(shared_series, aes(x = Date, y = `Cumulative cases`, group = Postcode)) +
   geom_line(alpha = 1/3, colour = "firebrick") +
   labs(x = "Date", y = "Cumulative cases") +
   scale_y_log10()
-
+p
 ggplotly(p)
 ```
-
-
-
 
