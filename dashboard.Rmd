@@ -57,7 +57,7 @@ shared_cases <- SharedData$new(case_summary, key = ~Postcode, group = "series")
 nsw <- st_read("data/nsw_poa_simple.gpkg", quiet = TRUE) %>%
   select(Postcode = POA_CODE16) %>%
   left_join(case_summary) %>%
-  mutate(Count = replace_na(Count, 0))
+  replace_na(list(Count = 0, `Cases per 100,000` = 0))
 
 shared_nsw <- SharedData$new(nsw, key = ~Postcode, group = "series")
 ```
@@ -69,10 +69,15 @@ Column {data-width=650, .tabset}
 ### NSW choropleth by postcode
 
 ```{r}
+count_pal <- colorNumeric(palette = "Reds",
+                          domain = c(0, max(case_summary$Count)))
+
 rate_pal <- colorNumeric(palette = "Reds",
-                          domain = case_summary$Count)
-pop_pal <- colorNumeric(palette = "Reds",
-                          domain = case_summary$`Cases per 100,000`)
+                         domain = c(0,
+                                    quantile(case_summary$`Cases per 100,000`,
+                                             0.999,
+                                             na.rm = TRUE)),
+                         na.color = "red")
 
 leaflet(shared_nsw) %>%
   addProviderTiles("Stamen.TonerLite") %>%
@@ -85,22 +90,21 @@ leaflet(shared_nsw) %>%
     weight = 0,
     color = "#fff",
     opacity = 0.01,
-    fillColor = ~rate_pal(Count),
+    fillColor = ~count_pal(Count),
     fillOpacity = 0.5,
-    label = ~str_glue("Postcode: {Postcode}; {Count} cases"),
+    label = ~(str_glue("Postcode: {Postcode}; {Count} cases")),
     highlight = highlightOptions(weight = 5,
                                  stroke = TRUE, 
                                  color = "#666",
                                  opacity = 2/3,
                                  bringToFront = TRUE)) %>%
-  addLegend(pal = rate_pal, values = ~Count, title = "Case count", group = "Case count") %>%
-    addPolygons(
+      addPolygons(
     group = "Case rate",
     stroke = TRUE,
     weight = 0,
     color = "#fff",
     opacity = 0.01,
-    fillColor = ~pop_pal(`Cases per 100,000`),
+    fillColor = ~rate_pal(`Cases per 100,000`),
     fillOpacity = 0.5,
     label = ~str_glue("Postcode: {Postcode}; {`Cases per 100,000`} cases per 100,000 people"),
     highlight = highlightOptions(weight = 5,
@@ -108,10 +112,14 @@ leaflet(shared_nsw) %>%
                                  color = "#666",
                                  opacity = 2/3,
                                  bringToFront = TRUE)) %>%
-  addLegend(pal = pop_pal,
+  addLegend(pal = rate_pal,
             values = ~`Cases per 100,000`,
             title = "Case rate <br>(per 100,000)",
-            group = "Case rate")
+            group = "Case rate") %>%
+  addLegend(pal = count_pal,
+            values = ~Count,
+            title = "Case count",
+            group = "Case count")
 
 ```
 
