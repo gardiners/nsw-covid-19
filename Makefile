@@ -9,7 +9,7 @@ update:
 	Rscript dataprep-covid.R
 
 docs/index.html : dashboard.Rmd data/nsw_poa_simple.gpkg data/poa_pop.csv update
-	Rscript Render.R
+	Rscript render.R
 
 clean :
 	rm -rf data/nsw_poa_simple.gpkg data/case_stream.rds docs dashboard.html
